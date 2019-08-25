@@ -1,128 +1,119 @@
-// mySQL database script
-
-// Create database Bamazon;
-
-// USE Bamazon;
-
-// CREATE TABLE products (
-  
-//   item_Id INTEGER(11) auto_increment,
-//   product_name VARCHAR(100) NULL,
-//   department_name VARCHAR(100) NULL,
-//   price DECIMAL(10,2) NOT NULL,
-//   stock_quantity INTEGER(4) NOT NULL,
-//   PRIMARY KEY (item_Id)
-// );
-
-// INSERT INTO products (product_name, department_name, price, stock_quantity)
-// VALUES ("Milk", "Dairy", 04.00, 20);
-
-// INSERT INTO products (product_name, department_name, price, stock_quantity)
-// VALUES ("Bell Pepper", "Produce", 2.00, 20);
-
-// INSERT INTO products (product_name, department_name, price, stock_quantity)
-// VALUES ("Lay's Chips Family", "Snack", 06.00, 20);
-
-// INSERT INTO products (product_name, department_name, price, stock_quantity)
-// VALUES ("Apples", "Fruit", 03.00, 20);
-
-// INSERT INTO products (product_name, department_name, price, stock_quantity)
-// VALUES ("Beef", "Meat", 04.00, 20);
-
-// INSERT INTO products (product_name, department_name, price, stock_quantity)
-// VALUES ("Celery", "Produce", 01.00, 20);
-
-// INSERT INTO products (product_name, department_name, price, stock_quantity)
-// VALUES ("Onions", "Produce", 08.00, 20);
-
-// INSERT INTO products (product_name, department_name, price, stock_quantity)
-// VALUES ("Watermelon", "Fruit", 05.00, 20);
-
-// INSERT INTO products (product_name, department_name, price, stock_quantity)
-// VALUES ("Spaghetti", "Pasta", 02.00, 20);
-
-// INSERT INTO products (product_name, department_name, price, stock_quantity)
-// VALUES ("T-bone Steak", "Meat", 16.00, 20);
-
-//Requiring the necessary node packages
-
+// Initializes the npm packages used
 var mysql = require("mysql");
-var prompt = require("prompt");
+var inquirer = require("inquirer");
 
-// Connection to the Bamazon database.
+// Initializes the connection variable to sync with a MySQL database
 var connection = mysql.createConnection({
-  host: 'localhost',
-  user: 'root',
-  password: 'John3:16',
-  database: 'Bamazon'
+  host: "localhost",
+  port: 3306,
+
+  // Your username
+  user: "root",
+
+  // Your password
+    password: "melmatt6",
+  database: "Bamazon"
 });
 
-var execute = function(){
-
-	connection.query("SELECT * FROM Products", function(err, result) {
-		return (prettyTable(result));
-	  
-	  });
-
-	setTimeout(function() {
-	    prompt.get(['ItemID', 'Quantity'], function (err, result) {
-		    var shopperItem = result.ItemID;
-		    var shopperQuantity =result.Quantity;
-
-		    inventoryCheck(shopperItem, shopperQuantity);
-		    setTimeout(function() {execute();}, 3500);
-
-		});
-	}, 750);
-}
-
-//Out of stock function.
-
-var inventoryCheck = function (id, quantity){
-	connection.query('SELECT * FROM Products WHERE item_Id = ' + id, function (err, result){
-		if (err) throw err;
-
-		var total = result[0].price * quantity;
-
-		var inventory = result[0].stock_quantity - quantity;
-
-		if (inventory < 0){
-			console.log('Insufficient stock. There are only '+ result[0].stock_quantity + 'item(s) left.');
-		} else {
-			console.log('User has bought ' + quantity + ' ' + result[0].product_name + ' for $' + total);
-			console.log('There are ' + inventory + ' ' + result[0].product_name + ' remaining.')
-			databaseUpdate(id, inventory)
-		}
-	});
-}
-
-// Updating the database after a sale. 
-
-var databaseUpdate = function(id, quantity){
-	connection.query('update products set stock_quantity = ' + quantity + ' where item_Id = ' + id, function(err, result) {
-        if (err) throw err;
-    });
-}
-
-function prettyTable(items){
-	for (var i = 0; i < items.length; i++) {
-		console.log('------------------------');
-		console.log('ItemID: ' + items[i].item_Id);
-		console.log('Item: ' + items[i].product_name);
-		console.log('Department: ' + items[i].department_name);
-		console.log('Price: $' + items[i].price);
-	}
-	console.log('------------------------');
-}
-
-
-// Connecting to the Bamazon Database.
+// Creates the connection with the server and makes the table upon successful connection
 connection.connect(function(err) {
-    if (err) {
-		console.error('error connecting: ' + err);
-	    return;
-	}
+  if (err) {
+    console.error("error connecting: " + err.stack);
+  }
+  makeTable();
 });
 
-//Do it...
-execute();
+// Function to grab the products table from the database and print results to the console
+var makeTable = function() {
+
+  // Selects all of the data from the MySQL products table
+  connection.query("SELECT * FROM products", function(err, res) {
+    if (err) throw err;
+
+    // Prints the table to the console with minimal styling
+    var tab = "\t";
+    console.log("ItemID\tProduct Name\tDepartment Name\tPrice\t# In Stock");
+    console.log("--------------------------------------------------------");
+
+    // For loop goes through the MySQL table and prints each individual row on a new line
+    for (var i = 0; i < res.length; i++) {
+      console.log(res[i].item_id + tab + res[i].product_name + tab +
+        res[i].department_name + tab + res[i].price + tab + res[i].stock_quantity);
+    }
+    console.log("--------------------------------------------------------");
+
+    // Runs the customer's prompts after creating the table.
+    // Sends res so the promptCustomer function is able to search though the data
+    promptCustomer(res);
+  });
+};
+
+// Function containing all customer prompts
+var promptCustomer = function(res) {
+
+  // Prompts user for what they would like to purchase
+  inquirer.prompt([{
+    type: "input",
+    name: "choice",
+    message: "What would you like to purchase? [Quit with Q]"
+  }]).then(function(val) {
+
+    // Set the var correct to false so as to make sure the user inputs a valid product name
+    var correct = false;
+
+    // Loops through the MySQL table to check that the product they wanted exists
+    for (var i = 0; i < res.length; i++) {
+
+      // If the product exists, save the data for said product within the product and id variables
+      if (res[i].product_name === val.choice) {
+        correct = true;
+        var product = val.choice;
+        var id = i;
+
+        // Prompts the user to see how many of the product they would like to buy
+        inquirer.prompt([{
+          type: "input",
+          name: "quant",
+          message: "How many would you like to buy?"
+        }]).then(function(val) {
+
+          // Checks to see if the amount requested is less than the amount that is available
+          if ((res[id].stock_quantity - val.quant) > 0) {
+
+            // Removes the amount requested from the MySQL table
+            connection.query(
+              "UPDATE products SET stock_quantity='" + (res[id].stock_quantity - val.quant) +
+              "' WHERE product_name='" + product + "'",
+              function(err, res2) {
+                if (err) {
+                  throw err;
+                }
+
+                // Tells the user that the product has been purchased
+                console.log("PRODUCT BOUGHT!");
+
+                // Rewrites the table and starts again
+                makeTable();
+              });
+          }
+
+          // If the amount requested was greater than the amount available, restarts prompts
+          else {
+            console.log("NOT A VALID SELECTION!");
+            promptCustomer(res);
+          }
+        });
+      }
+      // If the user inputed Q, exist program
+      if (val.choice === "Q" || val.choice === "q") {
+        process.exit();
+      }
+    }
+
+    // If the product requested does not exist, restarts prompts
+    if (i === res.length && correct === false) {
+      console.log("NOT A VALID SELECTION");
+      promptCustomer(res);
+    }
+  });
+};
